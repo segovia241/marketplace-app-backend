@@ -1,6 +1,7 @@
 package com.marketplace.marketplace_app_backend.controller;
 
 import com.marketplace.marketplace_app_backend.model.Product;
+import com.marketplace.marketplace_app_backend.model.ProductStatus;
 import com.marketplace.marketplace_app_backend.repository.ProductRepository;
 import org.springframework.web.bind.annotation.*;
 
@@ -39,7 +40,12 @@ public class ProductController {
 
     @GetMapping("/status/{status}")
     public List<Product> getProductsByStatus(@PathVariable String status) {
-        return repository.findByStatus(status);
+        try {
+            ProductStatus productStatus = ProductStatus.valueOf(status.toUpperCase());
+            return repository.findByStatus(productStatus);
+        } catch (IllegalArgumentException e) {
+            throw new RuntimeException("Invalid status value: " + status + ". Valid values: ACTIVE, SOLD_OUT, UNDER_REVIEW");
+        }
     }
 
     @GetMapping("/search")

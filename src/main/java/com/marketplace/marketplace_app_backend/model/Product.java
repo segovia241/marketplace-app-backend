@@ -1,7 +1,6 @@
 package com.marketplace.marketplace_app_backend.model;
 
 import jakarta.persistence.*;
-
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
@@ -32,8 +31,9 @@ public class Product {
     @Column(nullable = false)
     private Integer stock = 0;
 
+    @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private String status = "Active";
+    private ProductStatus status = ProductStatus.ACTIVE;
 
     @ManyToOne
     @JoinColumn(name = "seller_id", nullable = false)
@@ -72,8 +72,8 @@ public class Product {
     public Integer getStock() { return stock; }
     public void setStock(Integer stock) { this.stock = stock; }
 
-    public String getStatus() { return status; }
-    public void setStatus(String status) { this.status = status; }
+    public ProductStatus getStatus() { return status; }
+    public void setStatus(ProductStatus status) { this.status = status; }
 
     public User getSeller() { return seller; }
     public void setSeller(User seller) { this.seller = seller; }

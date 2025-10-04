@@ -2,6 +2,7 @@ package com.marketplace.marketplace_app_backend.controller;
 
 import com.marketplace.marketplace_app_backend.model.BasicUser;
 import com.marketplace.marketplace_app_backend.repository.BasicUserRepository;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -12,9 +13,11 @@ import java.util.Optional;
 public class BasicUserController {
 
     private final BasicUserRepository repository;
+    private final PasswordEncoder passwordEncoder;
 
-    public BasicUserController(BasicUserRepository repository) {
+    public BasicUserController(BasicUserRepository repository, PasswordEncoder passwordEncoder) {
         this.repository = repository;
+        this.passwordEncoder = passwordEncoder;
     }
 
     @GetMapping
@@ -27,23 +30,17 @@ public class BasicUserController {
         return repository.findById(id);
     }
 
-    @PostMapping
-    public BasicUser createUser(@RequestBody BasicUser user) {
-        return repository.save(user);
-    }
-
     @PutMapping("/{id}")
     public BasicUser updateUser(@PathVariable Long id, @RequestBody BasicUser updatedUser) {
         return repository.findById(id)
                 .map(user -> {
                     user.setEmail(updatedUser.getEmail());
-                    user.setPassword(updatedUser.getPassword());
+                    if (updatedUser.getPassword() != null && !updatedUser.getPassword().isEmpty()) {
+                        user.setPassword(passwordEncoder.encode(updatedUser.getPassword()));
+                    }
                     return repository.save(user);
                 })
-                .orElseGet(() -> {
-                    updatedUser.setId(id);
-                    return repository.save(updatedUser);
-                });
+                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
     }
 
     @DeleteMapping("/{id}")
