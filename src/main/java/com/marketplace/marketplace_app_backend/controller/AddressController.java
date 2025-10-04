@@ -1,81 +1,77 @@
 package com.marketplace.marketplace_app_backend.controller;
 
 import com.marketplace.marketplace_app_backend.model.Address;
+import com.marketplace.marketplace_app_backend.model.User;
 import com.marketplace.marketplace_app_backend.repository.AddressRepository;
+import com.marketplace.marketplace_app_backend.security.JwtUtil;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
-import java.util.Optional;
 
 @RestController
 @RequestMapping("/addresses")
 public class AddressController {
 
-    private final AddressRepository repository;
+    private final AddressRepository addressRepository;
+    private final JwtUtil jwtUtil;
 
-    public AddressController(AddressRepository repository) {
-        this.repository = repository;
+    public AddressController(AddressRepository addressRepository, JwtUtil jwtUtil) {
+        this.addressRepository = addressRepository;
+        this.jwtUtil = jwtUtil;
     }
 
-    @GetMapping
-    public List<Address> getAllAddresses() {
-        return repository.findAll();
+    @GetMapping("/me")
+    public List<Address> getMyAddresses(@RequestHeader("Authorization") String authHeader) {
+        String token = jwtUtil.extractToken(authHeader);
+        User currentUser = jwtUtil.getUserFromToken(token);
+        return addressRepository.findByUserId(currentUser.getId());
     }
 
-    @GetMapping("/{id}")
-    public Optional<Address> getAddressById(@PathVariable Long id) {
-        return repository.findById(id);
+    @PostMapping("/me")
+    public Address createMyAddress(@RequestHeader("Authorization") String authHeader,
+                                   @RequestBody Address address) {
+        String token = jwtUtil.extractToken(authHeader);
+        User currentUser = jwtUtil.getUserFromToken(token);
+        address.setUser(currentUser);
+        return addressRepository.save(address);
     }
 
-    @GetMapping("/user/{userId}")
-    public List<Address> getAddressesByUser(@PathVariable Long userId) {
-        return repository.findByUserId(userId);
-    }
+    @PutMapping("/me/{id}")
+    public Address updateMyAddress(@RequestHeader("Authorization") String authHeader,
+                                   @PathVariable Long id,
+                                   @RequestBody Address updatedAddress) {
+        String token = jwtUtil.extractToken(authHeader);
+        User currentUser = jwtUtil.getUserFromToken(token);
 
-    @GetMapping("/user/{userId}/residence")
-    public Optional<Address> getResidenceAddressByUser(@PathVariable Long userId) {
-        return repository.findByUserIdAndIsResidenceTrue(userId);
-    }
-
-    @GetMapping("/location")
-    public List<Address> getAddressesByLocation(
-            @RequestParam String country,
-            @RequestParam String departmentRegion,
-            @RequestParam String province,
-            @RequestParam String district) {
-        return repository.findByCountryAndDepartmentRegionAndProvinceAndDistrict(
-            country, departmentRegion, province, district);
-    }
-
-    @PostMapping
-    public Address createAddress(@RequestBody Address address) {
-        return repository.save(address);
-    }
-
-    @PutMapping("/{id}")
-    public Address updateAddress(@PathVariable Long id, @RequestBody Address updatedAddress) {
-        return repository.findById(id)
-                .map(address -> {
-                    address.setUser(updatedAddress.getUser());
-                    address.setCountry(updatedAddress.getCountry());
-                    address.setDepartmentRegion(updatedAddress.getDepartmentRegion());
-                    address.setProvince(updatedAddress.getProvince());
-                    address.setDistrict(updatedAddress.getDistrict());
-                    address.setUrbanizationStreetNumber(updatedAddress.getUrbanizationStreetNumber());
-                    address.setInteriorFloorApartment(updatedAddress.getInteriorFloorApartment());
-                    address.setAdditionalReference(updatedAddress.getAdditionalReference());
-                    address.setPostalCode(updatedAddress.getPostalCode());
-                    address.setIsResidence(updatedAddress.getIsResidence());
-                    return repository.save(address);
+        return addressRepository.findById(id)
+                .filter(addr -> addr.getUser().getId().equals(currentUser.getId()))
+                .map(addr -> {
+                    addr.setCountry(updatedAddress.getCountry());
+                    addr.setDepartmentRegion(updatedAddress.getDepartmentRegion());
+                    addr.setProvince(updatedAddress.getProvince());
+                    addr.setDistrict(updatedAddress.getDistrict());
+                    addr.setUrbanizationStreetNumber(updatedAddress.getUrbanizationStreetNumber());
+                    addr.setInteriorFloorApartment(updatedAddress.getInteriorFloorApartment());
+                    addr.setAdditionalReference(updatedAddress.getAdditionalReference());
+                    addr.setPostalCode(updatedAddress.getPostalCode());
+                    addr.setIsResidence(updatedAddress.getIsResidence());
+                    return addressRepository.save(addr);
                 })
-                .orElseGet(() -> {
-                    updatedAddress.setId(id);
-                    return repository.save(updatedAddress);
-                });
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Dirección no encontrada o no pertenece al usuario"));
     }
 
-    @DeleteMapping("/{id}")
-    public void deleteAddress(@PathVariable Long id) {
-        repository.deleteById(id);
+    @DeleteMapping("/me/{id}")
+    public void deleteMyAddress(@RequestHeader("Authorization") String authHeader,
+                                @PathVariable Long id) {
+        String token = jwtUtil.extractToken(authHeader);
+        User currentUser = jwtUtil.getUserFromToken(token);
+
+        Address address = addressRepository.findById(id)
+                .filter(addr -> addr.getUser().getId().equals(currentUser.getId()))
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Dirección no encontrada o no pertenece al usuario"));
+
+        addressRepository.delete(address);
     }
 }

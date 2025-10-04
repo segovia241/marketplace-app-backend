@@ -12,4 +12,5 @@ public interface UserRepository extends JpaRepository<User, Long> {
     Optional<User> findByDni(String dni);
     Optional<User> findByRuc(String ruc);
     List<User> findByVerificationStatus(Boolean verificationStatus);
+    Optional<User> findByBasicUserEmail(String email);
 }

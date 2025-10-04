@@ -32,11 +32,9 @@ public class LoginController {
         Optional<BasicUser> existingUser = repository.findByEmail(user.getEmail());
         if (existingUser.isPresent() && passwordEncoder.matches(user.getPassword(), existingUser.get().getPassword())) {
             String token = jwtUtil.generateToken(existingUser.get().getEmail());
-            return Collections.singletonMap("token", token); // Devuelve JSON {"token": "..."}
+            return Collections.singletonMap("token", token);
         }
         throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Credenciales inválidas");
     }
-
-    
 
 }
