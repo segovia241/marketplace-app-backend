@@ -39,6 +39,10 @@ public class User {
 
     private String ruc;
 
+    // Nueva columna para la URL de la foto de perfil
+    @Column(name = "profile_photo_url")
+    private String profilePhotoUrl;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt = LocalDateTime.now();
 
@@ -83,6 +87,9 @@ public class User {
 
     public String getRuc() { return ruc; }
     public void setRuc(String ruc) { this.ruc = ruc; }
+
+    public String getProfilePhotoUrl() { return profilePhotoUrl; }
+    public void setProfilePhotoUrl(String profilePhotoUrl) { this.profilePhotoUrl = profilePhotoUrl; }
 
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
