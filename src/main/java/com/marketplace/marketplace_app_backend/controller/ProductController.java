@@ -52,7 +52,7 @@ public class ProductController {
         
         // Validar stock mínimo
         if (newProduct.getStock() == null || newProduct.getStock() < 0) {
-            newProduct.setStock(0);
+            newProduct.setStock(1);
         }
 
         return repository.save(newProduct);
