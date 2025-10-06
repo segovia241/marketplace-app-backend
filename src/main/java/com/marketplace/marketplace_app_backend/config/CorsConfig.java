@@ -13,11 +13,12 @@ public class CorsConfig {
         return new WebMvcConfigurer() {
             @Override
             public void addCorsMappings(CorsRegistry registry) {
-                registry.addMapping("/**") // 🔹 todas las rutas
-                        .allowedOriginPatterns("*") // 🔹 permite cualquier origen
+                registry.addMapping("/**")
+                        .allowedOrigins("http://localhost:3000", "https://supersafe-jeanna-spinulose.ngrok-free.dev")
                         .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
                         .allowedHeaders("*")
                         .allowCredentials(true);
+
             }
         };
     }
