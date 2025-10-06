@@ -2,96 +2,111 @@ package com.marketplace.marketplace_app_backend.controller;
 
 import com.marketplace.marketplace_app_backend.model.Product;
 import com.marketplace.marketplace_app_backend.model.ProductStatus;
+import com.marketplace.marketplace_app_backend.model.User;
 import com.marketplace.marketplace_app_backend.repository.ProductRepository;
+import com.marketplace.marketplace_app_backend.security.JwtUtil;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
-import java.util.Optional;
 
 @RestController
 @RequestMapping("/products")
 public class ProductController {
 
     private final ProductRepository repository;
+    private final JwtUtil jwtUtil;
 
-    public ProductController(ProductRepository repository) {
+    public ProductController(ProductRepository repository, JwtUtil jwtUtil) {
         this.repository = repository;
+        this.jwtUtil = jwtUtil;
     }
 
+    // ---------------------- TODOS LOS PRODUCTOS (TEST) ----------------------
     @GetMapping
     public List<Product> getAllProducts() {
         return repository.findAll();
     }
 
-    @GetMapping("/{id}")
-    public Optional<Product> getProductById(@PathVariable Long id) {
-        return repository.findById(id);
+    // ---------------------- PRODUCTOS ACTIVOS CON STOCK ----------------------
+    @GetMapping("/active-in-stock")
+    public List<Product> getActiveProductsInStock() {
+        return repository.findByStatusAndStockGreaterThan(ProductStatus.ACTIVE, 0);
     }
 
-    @GetMapping("/category/{categoryId}")
-    public List<Product> getProductsByCategory(@PathVariable Long categoryId) {
-        return repository.findByCategoryCategoryId(categoryId);
-    }
-
-    @GetMapping("/seller/{sellerId}")
-    public List<Product> getProductsBySeller(@PathVariable Long sellerId) {
-        return repository.findBySellerId(sellerId);
-    }
-
-    @GetMapping("/status/{status}")
-    public List<Product> getProductsByStatus(@PathVariable String status) {
-        try {
-            ProductStatus productStatus = ProductStatus.valueOf(status.toUpperCase());
-            return repository.findByStatus(productStatus);
-        } catch (IllegalArgumentException e) {
-            throw new RuntimeException("Invalid status value: " + status + ". Valid values: ACTIVE, SOLD_OUT, UNDER_REVIEW");
-        }
-    }
-
-    @GetMapping("/search")
-    public List<Product> searchProducts(@RequestParam String name) {
-        return repository.findByProductNameContainingIgnoreCase(name);
-    }
-
-    @GetMapping("/price-range")
-    public List<Product> getProductsByPriceRange(
-            @RequestParam Double minPrice,
-            @RequestParam Double maxPrice) {
-        return repository.findByPriceBetween(minPrice, maxPrice);
-    }
-
-    @GetMapping("/in-stock")
-    public List<Product> getProductsInStock() {
-        return repository.findByStockGreaterThan(0);
-    }
-
+    // ---------------------- CREAR NUEVO PRODUCTO ----------------------
     @PostMapping
-    public Product createProduct(@RequestBody Product product) {
+    public Product createProduct(@RequestHeader("Authorization") String authHeader,
+                                 @RequestBody Product newProduct) {
+        String token = jwtUtil.extractToken(authHeader);
+        User currentUser = jwtUtil.getUserFromToken(token);
+
+        // Asignar el usuario autenticado como vendedor
+        newProduct.setSeller(currentUser);
+        
+        // Establecer estado por defecto si no se proporciona
+        if (newProduct.getStatus() == null) {
+            newProduct.setStatus(ProductStatus.ACTIVE);
+        }
+        
+        // Validar stock mínimo
+        if (newProduct.getStock() == null || newProduct.getStock() < 0) {
+            newProduct.setStock(0);
+        }
+
+        return repository.save(newProduct);
+    }
+
+    // ---------------------- PRODUCTOS DEL USUARIO ACTUAL ----------------------
+    @GetMapping("/me")
+    public List<Product> getMyProducts(@RequestHeader("Authorization") String authHeader) {
+        String token = jwtUtil.extractToken(authHeader);
+        User currentUser = jwtUtil.getUserFromToken(token);
+        return repository.findBySellerId(currentUser.getId());
+    }
+
+    // ---------------------- ACTUALIZAR PRODUCTO DEL USUARIO ACTUAL ----------------------
+    @PutMapping("/me/{productId}")
+    public Product updateMyProduct(@RequestHeader("Authorization") String authHeader,
+                                   @PathVariable Long productId,
+                                   @RequestBody Product updatedProduct) {
+        String token = jwtUtil.extractToken(authHeader);
+        User currentUser = jwtUtil.getUserFromToken(token);
+
+        Product product = repository.findById(productId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Producto no encontrado"));
+
+        if (!product.getSeller().getId().equals(currentUser.getId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "No puedes editar productos de otros usuarios");
+        }
+
+        // 🔒 No se puede cambiar id ni seller
+        product.setProductName(updatedProduct.getProductName());
+        product.setDescription(updatedProduct.getDescription());
+        product.setPrice(updatedProduct.getPrice());
+        product.setCategory(updatedProduct.getCategory());
+        product.setImages(updatedProduct.getImages());
+        product.setStock(updatedProduct.getStock());
+        product.setStatus(updatedProduct.getStatus());
+
         return repository.save(product);
     }
 
-    @PutMapping("/{id}")
-    public Product updateProduct(@PathVariable Long id, @RequestBody Product updatedProduct) {
-        return repository.findById(id)
-                .map(product -> {
-                    product.setProductName(updatedProduct.getProductName());
-                    product.setDescription(updatedProduct.getDescription());
-                    product.setPrice(updatedProduct.getPrice());
-                    product.setCategory(updatedProduct.getCategory());
-                    product.setImages(updatedProduct.getImages());
-                    product.setStock(updatedProduct.getStock());
-                    product.setStatus(updatedProduct.getStatus());
-                    product.setSeller(updatedProduct.getSeller());
-                    return repository.save(product);
-                })
-                .orElseGet(() -> {
-                    updatedProduct.setId(id);
-                    return repository.save(updatedProduct);
-                });
-    }
+    // ---------------------- ELIMINAR PRODUCTO DEL USUARIO ACTUAL ----------------------
+    @DeleteMapping("/me/{productId}")
+    public void deleteMyProduct(@RequestHeader("Authorization") String authHeader,
+                                @PathVariable Long productId) {
+        String token = jwtUtil.extractToken(authHeader);
+        User currentUser = jwtUtil.getUserFromToken(token);
 
-    @DeleteMapping("/{id}")
-    public void deleteProduct(@PathVariable Long id) {
-        repository.deleteById(id);
+        Product product = repository.findById(productId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Producto no encontrado"));
+
+        if (!product.getSeller().getId().equals(currentUser.getId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "No puedes eliminar productos de otros usuarios");
+        }
+
+        repository.delete(product);
     }
 }
