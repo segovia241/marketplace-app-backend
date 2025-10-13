@@ -35,6 +35,12 @@ public class AddressController {
         String token = jwtUtil.extractToken(authHeader);
         User currentUser = jwtUtil.getUserFromToken(token);
         address.setUser(currentUser);
+        
+        // Si esta dirección es la residencia, quitar el estado de residencia de las demás
+        if (Boolean.TRUE.equals(address.getIsResidence())) {
+            removeResidenceFromOtherAddresses(currentUser.getId());
+        }
+        
         return addressRepository.save(address);
     }
 
@@ -48,6 +54,12 @@ public class AddressController {
         return addressRepository.findById(id)
                 .filter(addr -> addr.getUser().getId().equals(currentUser.getId()))
                 .map(addr -> {
+                    // Si esta dirección se está estableciendo como residencia, quitar el estado de las demás
+                    if (Boolean.TRUE.equals(updatedAddress.getIsResidence()) && 
+                        !Boolean.TRUE.equals(addr.getIsResidence())) {
+                        removeResidenceFromOtherAddresses(currentUser.getId());
+                    }
+                    
                     addr.setCountry(updatedAddress.getCountry());
                     addr.setDepartmentRegion(updatedAddress.getDepartmentRegion());
                     addr.setProvince(updatedAddress.getProvince());
@@ -73,5 +85,31 @@ public class AddressController {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Dirección no encontrada o no pertenece al usuario"));
 
         addressRepository.delete(address);
+        
+        // Si se eliminó la dirección que era residencia, podrías opcionalmente establecer otra como residencia
+        // Esto es opcional, dependiendo de tu lógica de negocio
+        if (Boolean.TRUE.equals(address.getIsResidence())) {
+            // Opcional: establecer la primera dirección restante como residencia
+            List<Address> remainingAddresses = addressRepository.findByUserId(currentUser.getId());
+            if (!remainingAddresses.isEmpty()) {
+                Address newResidence = remainingAddresses.get(0);
+                newResidence.setIsResidence(true);
+                addressRepository.save(newResidence);
+            }
+        }
+    }
+    
+    /**
+     * Método auxiliar para quitar el estado de residencia de todas las direcciones del usuario
+     * excepto potencialmente la que se está creando/actualizando
+     */
+    private void removeResidenceFromOtherAddresses(Long userId) {
+        List<Address> userAddresses = addressRepository.findByUserId(userId);
+        for (Address addr : userAddresses) {
+            if (Boolean.TRUE.equals(addr.getIsResidence())) {
+                addr.setIsResidence(false);
+                addressRepository.save(addr);
+            }
+        }
     }
 }
