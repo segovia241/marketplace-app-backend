@@ -5,6 +5,7 @@ import com.marketplace.marketplace_app_backend.model.ProductStatus;
 import com.marketplace.marketplace_app_backend.model.User;
 import com.marketplace.marketplace_app_backend.repository.ProductRepository;
 import com.marketplace.marketplace_app_backend.security.JwtUtil;
+
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
@@ -42,15 +43,12 @@ public class ProductController {
         String token = jwtUtil.extractToken(authHeader);
         User currentUser = jwtUtil.getUserFromToken(token);
 
-        // Asignar el usuario autenticado como vendedor
         newProduct.setSeller(currentUser);
-        
-        // Establecer estado por defecto si no se proporciona
+
         if (newProduct.getStatus() == null) {
             newProduct.setStatus(ProductStatus.ACTIVE);
         }
-        
-        // Validar stock mínimo
+
         if (newProduct.getStock() == null || newProduct.getStock() < 0) {
             newProduct.setStock(1);
         }
@@ -66,7 +64,7 @@ public class ProductController {
         return repository.findBySellerId(currentUser.getId());
     }
 
-    // ---------------------- ACTUALIZAR PRODUCTO DEL USUARIO ACTUAL ----------------------
+    // ---------------------- ACTUALIZAR PRODUCTO ----------------------
     @PutMapping("/me/{productId}")
     public Product updateMyProduct(@RequestHeader("Authorization") String authHeader,
                                    @PathVariable Long productId,
@@ -81,7 +79,6 @@ public class ProductController {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "No puedes editar productos de otros usuarios");
         }
 
-        // 🔒 No se puede cambiar id ni seller
         product.setProductName(updatedProduct.getProductName());
         product.setDescription(updatedProduct.getDescription());
         product.setPrice(updatedProduct.getPrice());
@@ -93,7 +90,7 @@ public class ProductController {
         return repository.save(product);
     }
 
-    // ---------------------- ELIMINAR PRODUCTO DEL USUARIO ACTUAL ----------------------
+    // ---------------------- ELIMINAR PRODUCTO ----------------------
     @DeleteMapping("/me/{productId}")
     public void deleteMyProduct(@RequestHeader("Authorization") String authHeader,
                                 @PathVariable Long productId) {
@@ -108,5 +105,25 @@ public class ProductController {
         }
 
         repository.delete(product);
+    }
+
+    // ---------------------- NUEVOS ENDPOINTS ----------------------
+
+    // 1️⃣ Últimos productos
+    @GetMapping("/latest")
+    public List<Product> getLatestProducts() {
+        return repository.findTop10ByOrderByCreatedAtDesc();
+    }
+
+    // 2️⃣ Recomendados
+    @GetMapping("/recommended")
+    public List<Product> getRecommendedProducts() {
+        return repository.findRandomProducts();
+    }
+
+    // 3️⃣ Stock bajo
+    @GetMapping("/low-stock")
+    public List<Product> getLowStockProducts() {
+        return repository.findLowStock();
     }
 }
